@@ -1,5 +1,5 @@
 CREATE TEMP FUNCTION
-  udf_aggregate_search_counts(search_counts ARRAY<STRUCT<list ARRAY<STRUCT<element STRUCT<engine STRING,
+  udf_search_counts_sum(search_counts ARRAY<STRUCT<list ARRAY<STRUCT<element STRUCT<engine STRING,
     source STRING,
     count INT64>>>>>) AS ((
     SELECT

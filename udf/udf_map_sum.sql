@@ -1,13 +1,14 @@
 CREATE TEMP FUNCTION
-  udf_aggregate_map_sum(maps ANY TYPE) AS (STRUCT(ARRAY(
+  udf_map_sum(maps ANY TYPE) AS (STRUCT(ARRAY(
       SELECT
-        AS STRUCT key,
-        SUM(value) AS value
+        AS STRUCT --
+        _key_value_pair.key,
+        SUM(_key_value_pair.value) AS value
       FROM
-        UNNEST(maps),
-        UNNEST(key_value)
+        UNNEST(maps) AS _map,
+        UNNEST(_map.key_value) AS _key_value_pair
       GROUP BY
-        key) AS key_value));
+        _key_value_pair.key) AS key_value));
 
 /*
 
