@@ -1,17 +1,41 @@
+CREATE TEMP FUNCTION
+  udf_mode_last(list ANY TYPE) AS ((
+    SELECT
+      _value
+    FROM
+      UNNEST(list) AS _value
+    WITH
+    OFFSET
+      AS
+    _offset
+    GROUP BY
+      _value
+    ORDER BY
+      COUNT(_value) DESC,
+      MAX(_offset) DESC
+    LIMIT
+      1 ));
+
 WITH
+  summary_addon_version AS (
+  SELECT
+    *,
+    udf_mode_last(ARRAY(
+    SELECT
+      element.version
+    FROM
+      UNNEST(active_addons.list)
+    WHERE
+      element.addon_id = 'followonsearch@mozilla.com')) AS addon_version
+  FROM
+    main_summary_v4
+  ),
   augmented AS (
   SELECT
     s.*,
     sc.element.source AS source,
     sc.element.count AS count,
     sc.element.engine AS engine,
-    (
-    SELECT
-      ANY_VALUE(element.version)
-    FROM
-      UNNEST(active_addons.list)
-    WHERE
-      element.addon_id = 'followonsearch@mozilla.com') AS addon_version,
     CASE
       WHEN (sc.element.source IN ('searchbar', 'urlbar', 'abouthome', 'newtab', 'contextmenu', 'system', 'activitystream', 'webextension', 'alias') OR sc.element.source IS NULL) THEN 'sap'
       WHEN STARTS_WITH(sc.element.source, 'in-content:sap:')
@@ -20,8 +44,9 @@ WITH
       WHEN STARTS_WITH(sc.element.source, 'in-content:organic:') THEN 'organic'
       ELSE 'unknown'
     END AS type
+
   FROM
-    main_summary_v4 AS s,
+    summary_addon_version AS s,
     UNNEST(search_counts.list) AS sc
   WHERE
     submission_date_s3 = @submission_date
