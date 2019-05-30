@@ -1,0 +1,6 @@
+{"submission_date": "2017-01-01", "engine": "google", "addon_version": "0.9.5", "sap": 4, "locale": "de", "country": "DE", "source": "urlbar", "default_search_engine": "google", "app_version": "52.0.3"}
+{"submission_date": "2017-01-01", "engine": "google", "addon_version": "0.9.5", "sap": 4, "source": "urlbar", "locale": "de", "country": "DE", "distribution_id": "totally not null", "default_search_engine": "google", "app_version": "54.0.1"}
+{"submission_date": "2017-01-01", "engine": "bing", "addon_version": "0.9.5", "sap": 4, "locale": "de", "country": "DE", "source": "urlbar", "default_search_engine": "google", "app_version": "54.0.1"}
+{"submission_date": "2017-01-01", "engine": "google", "addon_version": "0.9.5", "sap": 20, "locale": "de", "country": "DE", "source": "urlbar", "default_search_engine": "google", "app_version": "54.0.1"}
+{"submission_date": "2017-01-01", "engine": "yahoo", "addon_version": "0.9.5", "sap": 4, "locale": "de", "country": "DE", "source": "urlbar", "default_search_engine": "google", "app_version": "54.0.1"}
+{"submission_date": "2017-01-01", "engine": "google", "addon_version": "0.9.5", "sap": 4, "locale": "de", "country": "US", "source": "urlbar", "default_search_engine": "google", "app_version": "54.0.1"}

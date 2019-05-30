@@ -34,14 +34,16 @@ WITH
   SELECT
     s.*,
     sc.element.source AS source,
-    sc.element.count AS count,
     sc.element.engine AS engine,
+    sc.element.count AS count,
     CASE
       WHEN (sc.element.source IN ('searchbar', 'urlbar', 'abouthome', 'newtab', 'contextmenu', 'system', 'activitystream', 'webextension', 'alias') OR sc.element.source IS NULL) THEN 'sap'
       WHEN STARTS_WITH(sc.element.source, 'in-content:sap:')
     OR STARTS_WITH(sc.element.source, 'sap:') THEN 'tagged-sap'
       WHEN STARTS_WITH(sc.element.source, 'in-content:sap-follow-on:') OR STARTS_WITH(sc.element.source,'follow-on:') THEN 'tagged-follow-on'
       WHEN STARTS_WITH(sc.element.source, 'in-content:organic:') THEN 'organic'
+      WHEN STARTS_WITH(sc.element.source, 'ad-click:') THEN 'ad-click'
+      WHEN STARTS_WITH(sc.element.source, 'search-with-ads:') THEN 'search-with-ads'
       ELSE 'unknown'
     END AS type
 
@@ -50,13 +52,35 @@ WITH
     UNNEST(search_counts.list) AS sc
   WHERE
     submission_date_s3 = @submission_date
-    ),
+  UNION ALL
+  SELECT
+    s.*,
+    "ad-click:" as source,
+    ac.key as engine,
+    ac.value as count,
+    "ad-click" as type
+  FROM
+    summary_addon_version as s,
+    UNNEST(s.scalar_parent_browser_search_ad_clicks.key_value) as ac
+  WHERE
+    s.scalar_parent_browser_search_ad_clicks IS NOT NULL
+  UNION ALL
+  SELECT
+    s.*,
+    "search-with-ads:" as source,
+    ac.key as engine,
+    ac.value as count,
+    "search-with-ads" as type
+  FROM
+    summary_addon_version as s,
+    UNNEST(s.scalar_parent_browser_search_with_ads.key_value) as ac
+  WHERE
+    s.scalar_parent_browser_search_with_ads IS NOT NULL
+  ),
   aggregated AS (
   SELECT
     submission_date_s3 AS submission_date,
     addon_version,
-    HLL_COUNT.INIT(client_id,
-      12) AS _hll,
     app_version,
     country,
     distribution_id,
@@ -95,12 +119,13 @@ SELECT
   search_cohort,
   source,
   default_search_engine,
-  HLL_COUNT.MERGE(_hll) AS client_count,
-  SUM(IF(type = 'organic', count, 0)) AS organic,
-  SUM(IF(type = 'tagged-sap', count, 0)) AS tagged_sap,
-  SUM(IF(type = 'tagged-follow-on', count, 0)) AS tagged_follow_on,
-  SUM(IF(type = 'sap', count, 0)) AS sap,
-  SUM(IF(type = 'unknown', count, 0)) AS unknown
+  NULLIF(SUM(IF(type = 'organic', count, 0)), 0) AS organic,
+  NULLIF(SUM(IF(type = 'tagged-sap', count, 0)), 0) AS tagged_sap,
+  NULLIF(SUM(IF(type = 'tagged-follow-on', count, 0)), 0) AS tagged_follow_on,
+  NULLIF(SUM(IF(type = 'sap', count, 0)), 0) AS sap,
+  NULLIF(SUM(IF(type = 'ad-click', count, 0)), 0) AS ad_click,
+  NULLIF(SUM(IF(type = 'search-with-ads', count, 0)), 0) AS search_with_ads,
+  NULLIF(SUM(IF(type = 'unknown', count, 0)), 0) AS unknown
 FROM
   aggregated
 GROUP BY
