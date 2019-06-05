@@ -81,7 +81,7 @@ function format(file) {
 }
 
 function listSqlFiles(file) {
-  if (['node_modules', '.git'].indexOf(path.basename(file)) > -1) {
+  if (['node_modules', '.git'].includes(path.basename(file))) {
     // don't scan these directories
   } else if (fs.statSync(file).isDirectory()) {
     return fs.readdirSync(file).flatMap(basename => listSqlFiles(path.join(file, basename)));
