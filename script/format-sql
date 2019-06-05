@@ -86,7 +86,7 @@ function listSqlFiles(file) {
   } else if (fs.statSync(file).isDirectory()) {
     return fs.readdirSync(file).flatMap(basename => listSqlFiles(path.join(file, basename)));
   } else if (file === '/dev/stdin' || file.endsWith('.sql')) {
-    return file;
+    return [file];
   }
   return [];
 }
