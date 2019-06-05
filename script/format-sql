@@ -1,0 +1,109 @@
+#!/usr/bin/env node
+
+const fs = require('fs');
+const path = require('path');
+const Formatter = require('sql-formatter/lib/core/Formatter');
+const Tokenizer = require('sql-formatter/lib/core/Tokenizer');
+
+// Define keywords for BigQuery Standard SQL
+// These words get capitalized
+const reservedWords = [
+  'ASSERT_ROWS_MODIFIED', 'ALL', 'AND', 'ANY', 'ARRAY', 'AS', 'ASC', 'AT',
+  'BETWEEN', 'BY', 'CASE', 'CAST', 'COLLATE', 'CONTAINS',
+  'CREATE TEMP FUNCTION', 'CREATE TEMPORARY FUNCTION', 'CREATE', 'CROSS',
+  'CUBE', 'CURRENT', 'DEFAULT', 'DEFINE', 'DESC', 'DISTINCT', 'ELSE', 'END',
+  'ENUM', 'ESCAPE', 'EXCEPT', 'EXCLUDE', 'EXISTS', 'EXTRACT', 'FALSE',
+  'FETCH', 'FOLLOWING', 'FOR', 'FROM', 'FULL', 'GROUP', 'GROUPING', 'GROUPS',
+  'HASH', 'HAVING', 'IF', 'IGNORE', 'IN', 'INNER', 'INTERSECT', 'INTERVAL',
+  'INTO', 'IS', 'JOIN', 'LATERAL', 'LEFT', 'LIKE', 'LIMIT', 'LOOKUP',
+  'MERGE', 'NATURAL', 'NEW', 'NO', 'NOT', 'NULL', 'NULLS', 'OF', 'ON', 'OR',
+  'ORDER', 'OUTER', 'OVER', 'PARTITION', 'PRECEDING', 'PROTO', 'RANGE',
+  'RECURSIVE', 'RESPECT', 'RIGHT', 'ROLLUP', 'ROWS', 'SELECT', 'SET', 'SOME',
+  'STRUCT', 'TABLESAMPLE', 'THEN', 'TO', 'TREAT', 'TRUE', 'UNBOUNDED',
+  'UNION', 'UNNEST', 'USING', 'WHEN', 'WHERE', 'WINDOW', 'WITH', 'WITHIN',
+];
+// These words get their own line followed by increased indent
+const reservedToplevelWords = [
+  // DDL
+  'ALTER TABLE IF EXISTS', 'ALTER TABLE', 'CREATE OR REPLACE TABLE',
+  'CREATE TABLE IF NOT EXISTS', 'CREATE TABLE', 'DROP TABLE', 'DROP VIEW',
+  // DML
+  'DELETE FROM', 'DELETE', 'INSERT INTO', 'INSERT', 'MERGE INTO', 'MERGE',
+  'UPDATE',
+  // SQL
+  'CROSS JOIN', 'FROM', 'FULL JOIN', 'FULL OUTER JOIN', 'GROUP BY', 'HAVING',
+  'INNER JOIN', 'INTERSECT', 'JOIN', 'LEFT JOIN', 'LEFT OUTER JOIN', 'LIMIT',
+  'ORDER BY', 'OUTER JOIN', 'PARTITION BY', 'RIGHT JOIN', 'RIGHT OUTER JOIN',
+  'ROWS BETWEEN', 'ROWS', 'SELECT AS STRUCT', 'SELECT', 'SET', 'UNION ALL',
+  'UNION', 'USING', 'VALUES', 'WHERE',
+];
+// These words start a new line at the current indent
+const reservedNewlineWords = ['AND', 'BETWEEN', 'ELSE', 'OR', 'WHEN', 'XOR'];
+
+// BigQuery Standard SQL and capitalizing keywords aren't directly supported
+// by the sql-formatter library, so we implement support for those here
+function format(file) {
+  const tokenizer = new Tokenizer({
+    reservedWords,
+    reservedToplevelWords,
+    reservedNewlineWords,
+    // eslint-disable-next-line quotes
+    stringTypes: [`''`, '""', '``'],
+    openParens: ['(', 'CASE', '['],
+    closeParens: [')', 'END', ']'],
+    indexedPlaceholderTypes: ['?'],
+    namedPlaceholderTypes: ['@'],
+    lineCommentTypes: ['#', '--'],
+  });
+  // add >> and << to OPERATOR_REGEX to prevent spaces being added in the middle
+  tokenizer.OPERATOR_REGEX = /^(<<|>>|!=|<>|==|<=|>=|!<|!>|\|\||::|->>|->|~~\*|~~|!~~\*|!~~|~\*|!~\*|!~|.)/;
+  const formatter = new Formatter({}, tokenizer);
+  // read query file
+  const query = fs.readFileSync(file, 'utf-8');
+  // capitalize keywords
+  formatter.tokens = tokenizer.tokenize(query).map((token) => {
+    if (token.type.startsWith('reserved')) {
+      return { type: token.type, value: token.value.toUpperCase() };
+    }
+    return token;
+  });
+  // format whitespace
+  const formatted = `${formatter.getFormattedQueryFromTokens().trim()}\n`;
+  const changed = query !== formatted;
+  // write to stdout or log change and overwrite file
+  if (file === '/dev/stdin') {
+    process.stdout.write(formatted);
+  } else if (changed) {
+    console.log(`reformatted ${file}`);
+    fs.writeFileSync(file, formatted);
+  }
+  return changed;
+}
+
+function listSqlFiles(file) {
+  if (['node_modules', '.git'].indexOf(path.basename(file)) > -1) {
+    // don't scan these directories
+  } else if (fs.statSync(file).isDirectory()) {
+    return fs.readdirSync(file).flatMap(basename => listSqlFiles(path.join(file, basename)));
+  } else if (file === '/dev/stdin' || file.endsWith('.sql')) {
+    return file;
+  }
+  return [];
+}
+
+// Accept files or directories to format as command line arguments
+let files = process.argv.slice(2);
+// Default to formatting sql files in the current directory
+if (!files.length) {
+  files = ['.'];
+}
+// Get list of formatted files
+const reformatted = files.flatMap(listSqlFiles).filter(format);
+// Summarize changes unless we only formatted stdin
+if (files.length > 1 || files[0] !== '/dev/stdin') {
+  console.log(`${reformatted.length} file(s) reformatted`);
+}
+// Exit non-zero on changes to make CI fail
+if (reformatted.length) {
+  process.exit(1);
+}
