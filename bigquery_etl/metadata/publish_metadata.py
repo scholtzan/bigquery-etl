@@ -50,7 +50,9 @@ def publish_metadata(client, project, dataset, table, metadata):
             table.labels["deprecated"] = "true"
         if metadata.deletion_date:
             table.labels["deletion_date"] = metadata.deletion_date.strftime("%Y-%m-%d")
-            # TODO: in the future we can consider updating the table expiration date based on deletion_date
+            # TODO: in the future we can consider updating the table expiration date based on deletion_date            
+        if metadata.monitoring and metadata.monitoring.enabled:
+            table.labels["monitoring"] = "true"
 
         client.update_table(table, ["friendly_name", "description", "labels"])
         print("Published metadata for: {}.{}.{}".format(project, dataset, table))
